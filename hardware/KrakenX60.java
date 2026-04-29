@@ -20,26 +20,32 @@ import edu.wpi.first.units.AngularVelocityUnit;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.VectorKit.tuners.PidTuner;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
-public class KrakenX60 extends TalonFX {
+public class KrakenX60 extends SubsystemBase {
   private final Slot0Configs slot0Configs = new Slot0Configs();
   private final CurrentLimitsConfigs talonCurrentConfigs = new CurrentLimitsConfigs();
   private final MotorOutputConfigs motorOutputConfigs = new MotorOutputConfigs();
+
+  private final TalonFX m_motor;
   private final Supplier<TalonFXSimState> m_simState;
+
   private final Timer m_simTimer;
   private double lastTime;
   private final DCMotorSim m_sim;
 
   private final VelocityVoltage m_velocityControl = new VelocityVoltage(0).withSlot(0);
 
+  private PidTuner tuner = null;
+
   public KrakenX60(int ID) {
-    super(ID);
+    m_motor = new TalonFX(ID);
 
     m_simTimer = new Timer();
-    m_simState = () -> super.getSimState();
+    m_simState = () -> m_motor.getSimState();
     m_sim =
         new DCMotorSim(
             LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60Foc(1), 0.001, (18.0 / 70.0)),
@@ -49,11 +55,15 @@ public class KrakenX60 extends TalonFX {
     m_velocityControl.withEnableFOC(false);
   }
 
+  public void addTuner(PidTuner tuner) {
+    this.tuner = tuner;
+  }
+
   public void logCurrents(String path) {
     Logger.recordOutput(
-        String.format("%s/StatorCurrent", path), super.getStatorCurrent().getValueAsDouble());
+        String.format("%s/StatorCurrent", path), m_motor.getStatorCurrent().getValueAsDouble());
     Logger.recordOutput(
-        String.format("%s/SupplyCurrent", path), super.getSupplyCurrent().getValueAsDouble());
+        String.format("%s/SupplyCurrent", path), m_motor.getSupplyCurrent().getValueAsDouble());
   }
 
   public void updateSim() {
@@ -69,27 +79,27 @@ public class KrakenX60 extends TalonFX {
   }
 
   public double getRPM() {
-    return RPM.convertFrom(super.getVelocity().getValueAsDouble(), RotationsPerSecond);
+    return RPM.convertFrom(m_motor.getVelocity().getValueAsDouble(), RotationsPerSecond);
   }
 
   public void setVelocity(double vel, AngularVelocityUnit unit) {
-    super.feed();
-    super.setControl(m_velocityControl.withVelocity(RotationsPerSecond.convertFrom(vel, unit)));
+    m_motor.feed();
+    m_motor.setControl(m_velocityControl.withVelocity(RotationsPerSecond.convertFrom(vel, unit)));
   }
 
   public void setInverted(InvertedValue direction) {
     motorOutputConfigs.Inverted = direction;
-    super.getConfigurator().apply(motorOutputConfigs);
+    m_motor.getConfigurator().apply(motorOutputConfigs);
   }
 
   public void setBrakeMode(NeutralModeValue mode) {
     motorOutputConfigs.NeutralMode = mode;
-    super.getConfigurator().apply(motorOutputConfigs);
+    m_motor.getConfigurator().apply(motorOutputConfigs);
   }
 
   public void setFollower(KrakenX60 follower, MotorAlignmentValue motorAlignment) {
-    Follower m_followerRequest = new Follower(super.getDeviceID(), motorAlignment);
-    follower.setControl(m_followerRequest);
+    Follower m_followerRequest = new Follower(m_motor.getDeviceID(), motorAlignment);
+    follower.m_motor.setControl(m_followerRequest);
   }
 
   public void setPID(double kP, double kI, double kD) {
@@ -97,52 +107,14 @@ public class KrakenX60 extends TalonFX {
     slot0Configs.kI = kI;
     slot0Configs.kD = kD;
 
-    super.getConfigurator().apply(slot0Configs);
+    m_motor.getConfigurator().apply(slot0Configs);
   }
 
   public void setFF(double kS, double kV) {
     slot0Configs.kS = kS;
     slot0Configs.kV = kV;
 
-    super.getConfigurator().apply(slot0Configs);
-  }
-
-  public double getS() {
-    return slot0Configs.kS;
-  }
-
-  public void setS(double kS) {
-    slot0Configs.kS = kS;
-
-    super.getConfigurator().apply(slot0Configs);
-  }
-
-  public double getV() {
-    return slot0Configs.kV;
-  }
-
-  public void setV(double kV) {
-    slot0Configs.kV = kV;
-
-    super.getConfigurator().apply(slot0Configs);
-  }
-
-  public void setP(double kP) {
-    slot0Configs.kP = kP;
-
-    super.getConfigurator().apply(slot0Configs);
-  }
-
-  public void setI(double kI) {
-    slot0Configs.kI = kI;
-
-    super.getConfigurator().apply(slot0Configs);
-  }
-
-  public void setD(double kD) {
-    slot0Configs.kD = kD;
-
-    super.getConfigurator().apply(slot0Configs);
+    m_motor.getConfigurator().apply(slot0Configs);
   }
 
   public void updateFromTuner(PidTuner tuner) {
@@ -152,7 +124,7 @@ public class KrakenX60 extends TalonFX {
     slot0Configs.kV = tuner.getV();
     slot0Configs.kS = tuner.getS();
 
-    super.getConfigurator().apply(slot0Configs);
+    m_motor.getConfigurator().apply(slot0Configs);
   }
 
   public void setSupplyCurrentLimit(double maxAmps, double minAmps, double seconds) {
@@ -161,13 +133,18 @@ public class KrakenX60 extends TalonFX {
     talonCurrentConfigs.withSupplyCurrentLowerLimit(minAmps);
     talonCurrentConfigs.withSupplyCurrentLowerTime(seconds);
 
-    super.getConfigurator().apply(talonCurrentConfigs);
+    m_motor.getConfigurator().apply(talonCurrentConfigs);
   }
 
   public void setStatorCurrentLimit(double amps) {
     talonCurrentConfigs.withStatorCurrentLimitEnable(amps > 0);
     talonCurrentConfigs.withStatorCurrentLimit(amps);
 
-    super.getConfigurator().apply(talonCurrentConfigs);
+    m_motor.getConfigurator().apply(talonCurrentConfigs);
+  }
+
+  @Override
+  public void periodic() {
+    if (tuner != null) if (tuner.updated()) updateFromTuner(tuner);
   }
 }

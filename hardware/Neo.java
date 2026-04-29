@@ -8,29 +8,29 @@ import static edu.wpi.first.units.Units.RPM;
 
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.revrobotics.spark.SparkClosedLoopController;
-import com.revrobotics.spark.SparkFlex;
+import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
-import com.revrobotics.spark.config.SparkFlexConfig;
+import com.revrobotics.spark.config.SparkMaxConfig;
 import edu.wpi.first.units.AngularVelocityUnit;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.VectorKit.tuners.PidTuner;
 import java.util.function.Supplier;
 
-public class Vortex extends SubsystemBase {
+public class Neo extends SubsystemBase {
   private final SparkClosedLoopController pidController;
   private final SparkBaseConfig config;
 
-  private final SparkFlex m_motor;
+  private final SparkMax m_motor;
 
   private PidTuner tuner = null;
 
-  public Vortex(int ID) {
-    m_motor = new SparkFlex(ID, kBrushless);
+  public Neo(int ID) {
+    m_motor = new SparkMax(ID, kBrushless);
     pidController = m_motor.getClosedLoopController();
 
-    config = new SparkFlexConfig();
+    config = new SparkMaxConfig();
 
     m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
   }
@@ -41,13 +41,14 @@ public class Vortex extends SubsystemBase {
 
   public void setBrakeMode(boolean brakeMode) {
     config.idleMode(brakeMode ? IdleMode.kBrake : IdleMode.kCoast);
+    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
   }
 
   public Command set(Supplier<Double> speed) {
     return run(() -> m_motor.set(speed.get()));
   }
 
-  public void addFollower(Vortex follower, MotorAlignmentValue motorAlignment) {
+  public void addFollower(Neo follower, MotorAlignmentValue motorAlignment) {
     follower.config.follow(m_motor);
     follower.m_motor.configure(follower.config, kNoResetSafeParameters, kNoPersistParameters);
   }

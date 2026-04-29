@@ -3,11 +3,13 @@ package frc.robot.VectorKit.hardware;
 import com.ctre.phoenix6.Utils;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.simulation.DutyCycleEncoderSim;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.Random;
 import java.util.function.Supplier;
 
-public class AbsoluteEncoder extends DutyCycleEncoder {
+public class AbsoluteEncoder extends SubsystemBase {
   private final double kOffset;
+  private final DutyCycleEncoder m_enc;
   private final DutyCycleEncoderSim m_sim;
   private double simState;
 
@@ -20,7 +22,7 @@ public class AbsoluteEncoder extends DutyCycleEncoder {
   private boolean kIsReversed = false;
 
   public AbsoluteEncoder(int channel, double offset) {
-    super(channel);
+    m_enc = new DutyCycleEncoder(channel);
     kOffset = (offset / 360.0);
 
     if (Utils.isSimulation()) {
@@ -48,11 +50,10 @@ public class AbsoluteEncoder extends DutyCycleEncoder {
   }
 
   public double getRaw() {
-    return super.get();
+    return m_enc.get();
   }
 
   // TODO: Use simulated state as a sanity check
-  @Override
   public double get() {
     if (Utils.isSimulation()) return getSim();
     double degrees = getRaw() - kOffset;
@@ -97,5 +98,9 @@ public class AbsoluteEncoder extends DutyCycleEncoder {
 
     if (Utils.isSimulation()) m_sim.set(out);
     simState = out;
+  }
+
+  public boolean isConnected() {
+    return m_enc.isConnected();
   }
 }
