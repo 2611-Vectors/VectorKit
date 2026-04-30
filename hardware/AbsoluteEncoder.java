@@ -34,6 +34,10 @@ public class AbsoluteEncoder extends SubsystemBase {
         }
     }
 
+    public DutyCycleEncoder getRawEncoder() {
+        return m_enc;
+    }
+
     public void attachSource(Supplier<Double> source, int sourceGearTeeth, int encoderGearTeeth) {
         m_sourcePosition = source;
         kGearRatio = (double) sourceGearTeeth / (double) encoderGearTeeth;

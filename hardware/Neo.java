@@ -31,13 +31,16 @@ public class Neo extends SubsystemBase {
         m_PidController = m_Motor.getClosedLoopController();
 
         m_Config = new SparkMaxConfig();
-        
 
         m_Config.closedLoop
-            .outputRange(-1, 1)
-            .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
-            .p(0.0001).i(0).d(0)
-            .feedForward.kS(0.0).kV(0.0);
+                .outputRange(-1, 1)
+                .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
+                .p(0.0001)
+                .i(0)
+                .d(0)
+                .feedForward
+                .kS(0.0)
+                .kV(0.0);
 
         m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
     }
@@ -51,17 +54,33 @@ public class Neo extends SubsystemBase {
         m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
     }
 
+    public void setOutputRange(double min, double max) {
+        m_Config.closedLoop.outputRange(min, max);
+    }
+
     public Command set(Supplier<Double> speed) {
         return run(() -> m_Motor.set(speed.get()));
     }
 
     public void addFollower(Neo follower, MotorAlignmentValue motorAlignment) {
-        follower.m_Config.follow(m_Motor);
+        follower.m_Config.follow(m_Motor, motorAlignment == MotorAlignmentValue.Opposed);
         follower.m_Motor.configure(follower.m_Config, kNoResetSafeParameters, kNoPersistParameters);
     }
 
     public Command setVelocity(Supplier<Double> vel, Supplier<AngularVelocityUnit> unit) {
         return run(() -> m_PidController.setSetpoint(RPM.convertFrom(vel.get(), unit.get()), kVelocity));
+    }
+
+    public double getRPM() {
+        return m_Motor.getEncoder().getVelocity();
+    }
+
+    public double getAmperage() {
+        return m_Motor.getOutputCurrent();
+    }
+
+    public void stop() {
+        m_Motor.set(0.0);
     }
 
     public void setInverted(InvertedValue direction) {
