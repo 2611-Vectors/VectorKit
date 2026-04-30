@@ -7,9 +7,9 @@ import static com.revrobotics.spark.SparkLowLevel.MotorType.kBrushless;
 import static edu.wpi.first.units.Units.RPM;
 
 import com.ctre.phoenix6.signals.InvertedValue;
+import com.revrobotics.spark.FeedbackSensor;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkMax;
-import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import edu.wpi.first.units.AngularVelocityUnit;
@@ -19,85 +19,92 @@ import frc.robot.VectorKit.tuners.PidTuner;
 import java.util.function.Supplier;
 
 public class Neo extends SubsystemBase {
-  private final SparkClosedLoopController pidController;
-  private final SparkBaseConfig config;
+    private final SparkMax m_Motor;
 
-  private final SparkMax m_motor;
+    private final SparkClosedLoopController m_PidController;
+    private final SparkMaxConfig m_Config;
 
-  private PidTuner tuner = null;
+    private PidTuner tuner = null;
 
-  public Neo(int ID) {
-    m_motor = new SparkMax(ID, kBrushless);
-    pidController = m_motor.getClosedLoopController();
+    public Neo(int ID) {
+        m_Motor = new SparkMax(ID, kBrushless);
+        m_PidController = m_Motor.getClosedLoopController();
 
-    config = new SparkMaxConfig();
+        m_Config = new SparkMaxConfig();
+        
 
-    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+        m_Config.closedLoop
+            .outputRange(-1, 1)
+            .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
+            .p(0.0001).i(0).d(0)
+            .feedForward.kS(0.0).kV(0.0);
 
-  public void addTuner(PidTuner tuner) {
-    this.tuner = tuner;
-  }
+        m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  public void setBrakeMode(boolean brakeMode) {
-    config.idleMode(brakeMode ? IdleMode.kBrake : IdleMode.kCoast);
-    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+    public void addTuner(PidTuner tuner) {
+        this.tuner = tuner;
+    }
 
-  public Command set(Supplier<Double> speed) {
-    return run(() -> m_motor.set(speed.get()));
-  }
+    public void setBrakeMode(boolean brakeMode) {
+        m_Config.idleMode(brakeMode ? IdleMode.kBrake : IdleMode.kCoast);
+        m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  public void addFollower(Neo follower, MotorAlignmentValue motorAlignment) {
-    follower.config.follow(m_motor);
-    follower.m_motor.configure(follower.config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+    public Command set(Supplier<Double> speed) {
+        return run(() -> m_Motor.set(speed.get()));
+    }
 
-  public Command setVelocity(Supplier<Double> vel, Supplier<AngularVelocityUnit> unit) {
-    return run(() -> pidController.setSetpoint(RPM.convertFrom(vel.get(), unit.get()), kVelocity));
-  }
+    public void addFollower(Neo follower, MotorAlignmentValue motorAlignment) {
+        follower.m_Config.follow(m_Motor);
+        follower.m_Motor.configure(follower.m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  public void setInverted(InvertedValue direction) {
-    config.inverted(direction == InvertedValue.Clockwise_Positive);
-    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+    public Command setVelocity(Supplier<Double> vel, Supplier<AngularVelocityUnit> unit) {
+        return run(() -> m_PidController.setSetpoint(RPM.convertFrom(vel.get(), unit.get()), kVelocity));
+    }
 
-  public void setPID(double kP, double kI, double kD) {
-    config.closedLoop.pid(kP, kI, kD);
-    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+    public void setInverted(InvertedValue direction) {
+        m_Config.inverted(direction == InvertedValue.Clockwise_Positive);
+        m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  public void setFF(double kS, double kV) {
-    config.closedLoop.feedForward.sv(kS, kV);
-    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+    public void setPID(double kP, double kI, double kD) {
+        m_Config.closedLoop.pid(kP, kI, kD);
+        m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  public void updateFromTuner(PidTuner tuner) {
-    config.closedLoop.pid(tuner.getP(), tuner.getI(), tuner.getD());
-    config.closedLoop.feedForward.sv(tuner.getS(), tuner.getV());
-    m_motor.configure(config, kNoResetSafeParameters, kNoPersistParameters);
-  }
+    public void setFF(double kS, double kV) {
+        m_Config.closedLoop.feedForward.sv(kS, kV);
+        m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  @Override
-  public void periodic() {
-    if (tuner != null) if (tuner.updated()) updateFromTuner(tuner);
-  }
+    public void updateFromTuner(PidTuner tuner) {
+        m_Config.closedLoop.pid(tuner.getP(), tuner.getI(), tuner.getD());
+        m_Config.closedLoop.feedForward.sv(tuner.getS(), tuner.getV());
+        m_Motor.configure(m_Config, kNoResetSafeParameters, kNoPersistParameters);
+    }
 
-  /**
-   * The relationship between two motors in a mechanism. Depending on hardware setup, one motor may
-   * be inverted relative to the other motor.
-   */
-  public enum MotorAlignmentValue {
+    @Override
+    public void periodic() {
+        if (tuner != null) if (tuner.updated()) updateFromTuner(tuner);
+    }
+
     /**
-     * The two motor directions are aligned. Positive output on both motors moves the mechanism
-     * forward/backward.
+     * The relationship between two motors in a mechanism. Depending on hardware setup, one motor may
+     * be inverted relative to the other motor.
      */
-    Aligned(),
-    /**
-     * The two motor directions are opposed. To move forward/backward, one motor needs positive
-     * output, and the other needs negative output.
-     */
-    Opposed(),
-    ;
-  }
+    public enum MotorAlignmentValue {
+        /**
+         * The two motor directions are aligned. Positive output on both motors moves the mechanism
+         * forward/backward.
+         */
+        Aligned(),
+        /**
+         * The two motor directions are opposed. To move forward/backward, one motor needs positive
+         * output, and the other needs negative output.
+         */
+        Opposed(),
+        ;
+    }
 }
